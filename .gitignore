@@ -2,5 +2,5 @@
 /web.js
 /db
 .idea
-config
 secret
+faucet.db

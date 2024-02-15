@@ -95,7 +95,7 @@ app.get('/send/:chain/:address', async (req, res, next) => {
             checker.update(`${chain}${ip}`) // get ::1 on localhost
             const ret = await sendTx(address, chain);
             await checker.update(address)
-            res.send({ result: ret })
+            res.send({ result: ret, tokens: chainConf.tx.amount, recipient: address})
           }else {
             res.send({ result: "You requested too often" })
           }
@@ -132,7 +132,6 @@ async function sendCosmosTx(recipient, chain) {
     const [firstAccount] = await wallet.getAccounts();
 
     // console.log("sender", firstAccount);
-    console.log ("#################");
     const rpcEndpoint = chainConf.endpoint.rpc_endpoint;
     const client = await SigningStargateClient.connectWithSigner(rpcEndpoint, wallet);
 
@@ -140,19 +139,16 @@ async function sendCosmosTx(recipient, chain) {
     const amount = chainConf.tx.amount;
     const fee = chainConf.tx.fee;
     const initialAccountBalance = await client.getBalance(recipient, chainConf.tx.amount[0].denom)
-    console.log("Initial account balance:", initialAccountBalance.amount)
     try {
-      console.log("$$$$$$$$$$$$$")
       return await client.sendTokens(firstAccount.address, recipient, amount, fee);
     } catch(e) {
-      console.log("CATCH")
       const finalAccountBalance = await client.getBalance(recipient, chainConf.tx.amount[0].denom)
       const diff = BigNumber.from(finalAccountBalance.amount).sub(BigNumber.from(initialAccountBalance.amount))
       if (!diff.eq(BigNumber.from(amount[0].amount))) {
         throw new Error(`Recipient balance did not increase by the expected amount. Error: ${e.message}`)
       }
     }
-    console.log("SUCCESS")
+    console.log(`Sent ${amount} tokens to ${recipient}`)
     return {code: 0}
   }
   throw new Error(`Blockchain Config [${chain}] not found`)
@@ -161,7 +157,7 @@ async function sendCosmosTx(recipient, chain) {
 async function sendEvmosTx(recipient, chain) {
 
   try{
-    const chainConf = conf.blockchains.find(x => x.name === chain) 
+    const chainConf = conf.blockchains.find(x => x.name === chain)
     const ethProvider = new ethers.providers.JsonRpcProvider(chainConf.endpoint.evm_endpoint);
 
     const wallet = Wallet.fromMnemonic(chainConf.sender.mnemonic).connect(ethProvider);
@@ -174,13 +170,13 @@ async function sendEvmosTx(recipient, chain) {
     }
 
     let result = await wallet.sendTransaction(
-        { 
+        {
           from:wallet.address,
           to:evmAddress,
           value:chainConf.tx.amount.amount
         }
       );
-   
+
     let repTx = {
       "code":0,
       "nonce":result["nonce"],
@@ -199,12 +195,12 @@ async function sendEvmosTx(recipient, chain) {
 
 function toHexString(bytes) {
   return bytes.reduce(
-      (str, byte) => str + byte.toString(16).padStart(2, '0'), 
+      (str, byte) => str + byte.toString(16).padStart(2, '0'),
       '');
 }
 
 async function sendTx(recipient, chain) {
-  const chainConf = conf.blockchains.find(x => x.name === chain) 
+  const chainConf = conf.blockchains.find(x => x.name === chain)
   if(chainConf.type === 'Ethermint') {
     return sendEvmosTx(recipient, chain)
   }
@@ -215,7 +211,7 @@ async function sendTx(recipient, chain) {
 async function sendEvmosTx2(recipient, chain) {
 
   // use evmosjs to send transaction
-  const chainConf = conf.blockchains.find(x => x.name === chain) 
+  const chainConf = conf.blockchains.find(x => x.name === chain)
   // create a wallet instance
   const wallet = Wallet.fromMnemonic(chainConf.sender.mnemonic).connect(chainConf.endpoint.evm_endpoint);
 }
