@@ -127,14 +127,12 @@ async function sendCosmosTx(recipient, chain) {
   // const mnemonic = "surround miss nominee dream gap cross assault thank captain prosper drop duty group candy wealth weather scale put";
   const chainConf = conf.blockchains.find(x => x.name === chain) 
   if(chainConf) {
-    console.log("Chain conf found")
     const wallet = await DirectSecp256k1HdWallet.fromMnemonic(chainConf.sender.mnemonic, chainConf.sender.option);
     const [firstAccount] = await wallet.getAccounts();
 
     // console.log("sender", firstAccount);
     const rpcEndpoint = chainConf.endpoint.rpc_endpoint;
     const client = await SigningStargateClient.connectWithSigner(rpcEndpoint, wallet);
-
     // const recipient = "cosmos1xv9tklw7d82sezh9haa573wufgy59vmwe6xxe5";
     const amount = chainConf.tx.amount;
     const fee = chainConf.tx.fee;
