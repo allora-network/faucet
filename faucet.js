@@ -127,32 +127,25 @@ async function sendCosmosTx(recipient, chain) {
   // const mnemonic = "surround miss nominee dream gap cross assault thank captain prosper drop duty group candy wealth weather scale put";
   const chainConf = conf.blockchains.find(x => x.name === chain) 
   if(chainConf) {
-    console.log("Chain conf found")
     const wallet = await DirectSecp256k1HdWallet.fromMnemonic(chainConf.sender.mnemonic, chainConf.sender.option);
     const [firstAccount] = await wallet.getAccounts();
 
     // console.log("sender", firstAccount);
-    console.log ("#################");
     const rpcEndpoint = chainConf.endpoint.rpc_endpoint;
     const client = await SigningStargateClient.connectWithSigner(rpcEndpoint, wallet);
-
     // const recipient = "cosmos1xv9tklw7d82sezh9haa573wufgy59vmwe6xxe5";
     const amount = chainConf.tx.amount;
     const fee = chainConf.tx.fee;
     const initialAccountBalance = await client.getBalance(recipient, chainConf.tx.amount[0].denom)
-    console.log("Initial account balance:", initialAccountBalance.amount)
     try {
-      console.log("$$$$$$$$$$$$$")
       return await client.sendTokens(firstAccount.address, recipient, amount, fee);
     } catch(e) {
-      console.log("CATCH")
       const finalAccountBalance = await client.getBalance(recipient, chainConf.tx.amount[0].denom)
       const diff = BigNumber.from(finalAccountBalance.amount).sub(BigNumber.from(initialAccountBalance.amount))
       if (!diff.eq(BigNumber.from(amount[0].amount))) {
         throw new Error(`Recipient balance did not increase by the expected amount. Error: ${e.message}`)
       }
     }
-    console.log("SUCCESS")
     return {code: 0}
   }
   throw new Error(`Blockchain Config [${chain}] not found`)
