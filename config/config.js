@@ -14,17 +14,17 @@ export default {
         "path": `./faucet.db` // db for frequency checker(WIP)
     },
     "project": {
-        "name": "Allora DEVnet", // What ever you want, recommend: chain-id, 
+        "name": "Allora Edgenet", // What ever you want, recommend: chain-id, 
         "logo": "https://allora.network/images/allora/allora_logo.svg",
         "deployer": '<a href="https://allora.network">Allora</a>'
     },
     blockchains: [
     {
-        name: "allora-devnet",
+        name: "allora-testnet",
         endpoint: {
             // make sure that CORS is enabled in rpc section in config.toml
             // cors_allowed_origins = ["*"]
-            rpc_endpoint: "https://allora-rpc1.staging-us-east-1.behindthecurtain.xyz:8443",
+            rpc_endpoint: "allora-rpc.prod-us-east-1.edgenet.allora.network:8443",
         },
         sender: {
             mnemonic,
