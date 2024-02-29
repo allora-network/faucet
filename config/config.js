@@ -20,7 +20,7 @@ export default {
     },
     blockchains: [
     {
-        name: "allora-testnet",
+        name: "allora-edgenet",
         endpoint: {
             // make sure that CORS is enabled in rpc section in config.toml
             // cors_allowed_origins = ["*"]
