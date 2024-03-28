@@ -97,7 +97,12 @@ app.get('/send/:chain/:address', async (req, res, next) => {
             await checker.update(address)
             res.send({ result: ret, tokens: chainConf.tx.amount, recipient: address})
           }else {
-            res.send({ result: "You requested too often" })
+            res.send({
+              result: {
+                code: 429,
+                message: 'Too Many Requests',
+              }
+             })
           }
         } else {
           res.send({ result: `Address [${address}] is not supported.` })

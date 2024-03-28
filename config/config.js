@@ -20,11 +20,11 @@ export default {
     },
     blockchains: [
     {
-        name: "allora-edgenet",
+        name: "edgenet",
         endpoint: {
             // make sure that CORS is enabled in rpc section in config.toml
             // cors_allowed_origins = ["*"]
-            rpc_endpoint: "allora-rpc.prod-us-east-1.edgenet.allora.network:8443",
+            rpc_endpoint: "https://allora-rpc.edgenet.allora.network",
         },
         sender: {
             mnemonic,
@@ -44,7 +44,7 @@ export default {
         },
         limit: {
             // how many times each wallet address is allowed in a window(24h)
-            address: 300,
+            address: 2,
             // how many times each ip is allowed in a window(24h),
             // if you use proxy, double check if the req.ip is return client's ip.
             ip: 10000
