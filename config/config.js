@@ -15,7 +15,7 @@ export default {
     },
     "project": {
         "name": "Allora Edgenet", // What ever you want, recommend: chain-id, 
-        "logo": "https://allora.network/images/allora/allora_logo.svg",
+        "logo": "https://s3.amazonaws.com/assets.allora.network/logo.svg",
         "deployer": '<a href="https://allora.network">Allora</a>'
     },
     blockchains: [
