@@ -35,7 +35,7 @@ export default {
         },
         tx: {
             amount: [
-            { denom: "uallo", amount: "1000000000" },
+            { denom: "uallo", amount: "20000000000000000000" },
             ],
             fee: {
                 amount: [{ denom: "uallo", amount: "500" }],
@@ -47,7 +47,7 @@ export default {
             address: 2,
             // how many times each ip is allowed in a window(24h),
             // if you use proxy, double check if the req.ip is return client's ip.
-            ip: 10000
+            ip: 20
         }
     },
     ]
