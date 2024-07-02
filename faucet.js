@@ -22,7 +22,8 @@ app.set("view engine", "ejs");
 const checker = new FrequencyChecker(conf)
 
 app.use((req, res, next) => {
-  console.log(`Received ${req.method} request at ${req.url}`);
+  const clientip = req.headers['x-real-ip'] || req.headers['X-Real-IP'] || req.headers['X-Forwarded-For'] || req.ip
+  console.log(`Received ${req.method} request at ${req.url} from ${clientip}`);
   next();
 });
 
