@@ -24,7 +24,7 @@ const checker = new FrequencyChecker(conf)
 app.use((req, res, next) => {
   const clientip = req.headers['x-real-ip'] || req.headers['X-Real-IP'] || req.headers['X-Forwarded-For'] || req.ip
   console.log(`Received ${req.method} request at ${req.url} from ${clientip}`);
-  console.log(req.headers.entries());
+  console.log(req.headers['x-real-ip'],req.headers['X-Real-IP'],req.headers['X-Forwarded-For']);
   next();
 });
 
