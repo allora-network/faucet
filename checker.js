@@ -45,4 +45,26 @@ export class FrequencyChecker {
             }
         });
     }
+
+    async updateRequestStatus(requestId, status, message, data=null) {
+        const db = this.db
+        let request
+        try {
+            request = await db.get(requestId)
+            request.statuses.push(status)
+        } catch (error) {
+            if (error.status == 404) {
+                request = {statuses: [status]}
+            } else {
+                console.log(error, 'error')
+            }
+        }
+        await db.put(requestId, {data, statuses: request.statuses, messsage: message ? message : ''});
+    }
+
+    async getRequestStatus(requestId) {
+        const db = this.db
+        const request = await db.get(requestId);
+        return request
+    }
 }

@@ -9,8 +9,13 @@ import { bech32 } from 'bech32';
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
 import { SigningStargateClient } from "@cosmjs/stargate";
 
+import { Mutex } from 'async-mutex';
+import { v4 } from 'uuid';
+
 import conf from './config/config.js'
 import { FrequencyChecker } from './checker.js';
+
+const mutex = new Mutex();
 
 // load config
 console.log("loaded config: ", conf)
@@ -83,8 +88,24 @@ app.get('/balance/:chain', async (req, res) => {
   res.send(balance);
 })
 
+app.get('/status/:requestId', async (req, res, next) => {
+  return Promise.resolve().then(async () => {
+    const { requestId } = req.params;
+
+    const status = await checker.getRequestStatus(requestId);
+    if (status.statuses.length > 0) {
+      res.json(status);
+    } else {
+      res.status(404).json({ error: 'Request ID not found' });
+    }
+  }).catch(next)
+});
+
 app.get('/send/:chain/:address', async (req, res, next) => {
   return Promise.resolve().then(async () => {
+    const requestId = v4();
+    await checker.updateRequestStatus(requestId, 'pending', 'Request received');
+
     const {chain, address} = req.params;
     const ip = req.headers['x-real-ip'] || req.headers['X-Real-IP'] || req.headers['X-Forwarded-For'] || req.ip
     console.log('request tokens to ', address, ip)
@@ -93,20 +114,35 @@ app.get('/send/:chain/:address', async (req, res, next) => {
         const chainConf = conf.blockchains.find(x => x.name === chain)
         if (chainConf && (address.startsWith(chainConf.sender.option.prefix) || address.startsWith('0x'))) {
           if( await checker.checkAddress(address, chain) && await checker.checkIp(`${chain}${ip}`, chain) ) {
+
+            res.send({ requestId, message: "Faucet processing request", recipient: address})
             checker.update(`${chain}${ip}`) // get ::1 on localhost
-            const ret = await sendTx(address, chain);
-            await checker.update(address)
-            res.send({ result: ret, tokens: chainConf.tx.amount, recipient: address})
+
+            const release = await mutex.acquire();
+            let sendRes;
+            try {
+              const sendRes = await sendTx(address, chain);
+              await checker.updateRequestStatus(requestId, 'success', 'request processed successfully', sendRes);
+              await checker.update(address)
+            } catch (err) {
+              console.log(err, 'error');
+              await checker.updateRequestStatus(requestId, 'failed', 'Failed, Please contact to admin.');
+            } finally {
+              release();
+            }
           }else {
+            await checker.updateRequestStatus(requestId, 'failed', `Too Many Requests`);
             res.send({
               result: {
-                code: 429,
+                requestId,
                 message: 'Too Many Requests',
+                recipient: address
               }
              })
           }
         } else {
-          res.send({ result: `Address [${address}] is not supported.` })
+          await checker.updateRequestStatus(requestId, 'failed', `Address [${address}] is not supported.`);
+          res.send({requestId, message: `Address [${address}] is not supported.`, recipient: address })
         }
       // } catch (err) {
       //   console.error(err);
@@ -115,7 +151,8 @@ app.get('/send/:chain/:address', async (req, res, next) => {
 
     } else {
       // send result
-      res.send({ result: 'address is required' });
+      await checker.updateRequestStatus(requestId, 'failed', `address not provided`);
+      res.send({requestId, message: 'address is required' });
     }}).catch(next)
 })
 
