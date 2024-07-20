@@ -9,13 +9,8 @@ import { bech32 } from 'bech32';
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
 import { SigningStargateClient } from "@cosmjs/stargate";
 
-import { Mutex } from 'async-mutex';
-import { v4 } from 'uuid';
-
 import conf from './config/config.js'
 import { FrequencyChecker } from './checker.js';
-
-const mutex = new Mutex();
 
 // load config
 console.log("loaded config: ", conf)
@@ -54,6 +49,43 @@ app.get('/config.json', async (req, res) => {
   res.send(project);
 })
 
+const queue = [];
+const addressStatus = {};
+
+// Enqueue address
+const enqueueAddress = async (statusAddress) => {
+  console.log('Enqueueing address:', statusAddress);
+  if (!addressStatus[statusAddress] || addressStatus[statusAddress] === 'cleared') {
+    if (!queue.includes(statusAddress)) {
+      queue.push(statusAddress);
+    }
+  }
+};
+
+// Process addresses
+const processAddresses = async (chain) => {
+  console.log('Starting to process addresses');
+  while (true) {
+    console.log(`the lenght of the queue: ${queue.length}`);
+    if (queue.length > 0) {
+      const statusAddress = queue.shift();
+      const address = statusAddress.replace('status:', '');
+      try {
+        await sendTx(address, chain);
+      } catch (error) {
+        console.log(error, 'error')
+      }
+      addressStatus[statusAddress] = 'Completed';
+      await checker.put(statusAddress, 'Completed');
+    }
+
+    console.log('Waiting for 5 seconds cooldown period');
+    await new Promise(resolve => setTimeout(resolve, 5000));
+  }
+};
+
+processAddresses(conf.blockchains[0].name);
+
 app.get('/balance/:chain', async (req, res) => {
   const { chain }= req.params
 
@@ -88,23 +120,26 @@ app.get('/balance/:chain', async (req, res) => {
   res.send(balance);
 })
 
-app.get('/status/:requestId', async (req, res, next) => {
+app.get('/status/:address', async (req, res, next) => {
   return Promise.resolve().then(async () => {
-    const { requestId } = req.params;
+    const { address } = req.params;
+    const statusAddress = `status:${address}`;
 
-    const status = await checker.getRequestStatus(requestId);
-    if (status.statuses.length > 0) {
-      res.json(status);
-    } else {
-      res.status(404).json({ error: 'Request ID not found' });
+    let status = await checker.get(statusAddress);
+    if (!status) {
+      status = 'not found';
+    }
+    res.json({ code: 0, status });
+
+    if (status != 'not found') {
+      addressStatus[statusAddress] = 'cleared';
+      await checker.put(statusAddress, 'cleared');
     }
   }).catch(next)
 });
 
 app.get('/send/:chain/:address', async (req, res, next) => {
   return Promise.resolve().then(async () => {
-    const requestId = v4();
-    await checker.updateRequestStatus(requestId, 'pending', 'Request received');
 
     const {chain, address} = req.params;
     const ip = req.headers['x-real-ip'] || req.headers['X-Real-IP'] || req.headers['X-Forwarded-For'] || req.ip
@@ -114,35 +149,24 @@ app.get('/send/:chain/:address', async (req, res, next) => {
         const chainConf = conf.blockchains.find(x => x.name === chain)
         if (chainConf && (address.startsWith(chainConf.sender.option.prefix) || address.startsWith('0x'))) {
           if( await checker.checkAddress(address, chain) && await checker.checkIp(`${chain}${ip}`, chain) ) {
-
-            res.send({ requestId, message: "Faucet processing request", recipient: address})
             checker.update(`${chain}${ip}`) // get ::1 on localhost
 
-            const release = await mutex.acquire();
-            let sendRes;
-            try {
-              const sendRes = await sendTx(address, chain);
-              await checker.updateRequestStatus(requestId, 'success', 'request processed successfully', sendRes);
-              await checker.update(address)
-            } catch (err) {
-              console.log(err, 'error');
-              await checker.updateRequestStatus(requestId, 'failed', 'Failed, Please contact to admin.');
-            } finally {
-              release();
+            const statusAddress = `status:${address}`
+            if (addressStatus[statusAddress] === 'Completed') {
+              console.log('Address has already received faucet');
+              return res.status(400).json({ code: 1, message: 'Address has already received faucet' });
             }
+
+            await enqueueAddress(statusAddress);
+            res.json({ code: 0, message: 'Address enqueued for faucet processing. Please check status with your address' });
+
+            await checker.update(address)
+
           }else {
-            await checker.updateRequestStatus(requestId, 'failed', `Too Many Requests`);
-            res.send({
-              result: {
-                requestId,
-                message: 'Too Many Requests',
-                recipient: address
-              }
-             })
+            res.send({ code: 1, message: 'Too Many Requests'})
           }
         } else {
-          await checker.updateRequestStatus(requestId, 'failed', `Address [${address}] is not supported.`);
-          res.send({requestId, message: `Address [${address}] is not supported.`, recipient: address })
+          res.send({ code: 1, message: `Address [${address}] is not supported.`, recipient: address })
         }
       // } catch (err) {
       //   console.error(err);
@@ -151,8 +175,7 @@ app.get('/send/:chain/:address', async (req, res, next) => {
 
     } else {
       // send result
-      await checker.updateRequestStatus(requestId, 'failed', `address not provided`);
-      res.send({requestId, message: 'address is required' });
+      res.send({ code: 0, message: 'address is required' });
     }}).catch(next)
 })
 

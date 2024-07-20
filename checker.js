@@ -67,4 +67,21 @@ export class FrequencyChecker {
         const request = await db.get(requestId);
         return request
     }
+
+    async put(key, value) {
+        await this.db.put(key, value)
+    }
+
+    async get (address) {
+        try {
+            const status = await this.db.get(address);
+            return status
+        } catch (err) {
+            if (err.notFound) {
+                console.log('Address not found')
+            } else {
+                console.log('Database error')
+            }
+        }
+    }
 }

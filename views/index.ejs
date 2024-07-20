@@ -129,8 +129,8 @@
                 document.getElementById("address-button-loading").style.display = 'none';
                 // show result
                 this.message = `
-                <div class="alert alert-success alert-dismissible show fade mt-2" role="alert">
-                  <li>${data.message} with ID: ${data.requestId}</li>
+                <div class="alert alert-${data.code === 0 ? 'success' : 'danger'} alert-dismissible show fade mt-2" role="alert">
+                  <li>${data.message}</li>
                 </div>
                 `;
               } catch (e) {
