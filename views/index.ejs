@@ -21,24 +21,38 @@
           </p>
         </div>
         <div class="row g-5">
-          <div class="input-group">
-              <span class="input-group-text">
-                <select v-model="chain" @change="onChange()">
-                  <option v-for="c in conf.blockchains">{{c}}</option>
-                </select>
-              </span>
-              <input id="address" class="form-control" :placeholder="placeholder" v-model="address" name="address">
-              <button type="button" class="btn btn-secondary d-flex flex-row " @click="requestToken(this)">
-                <span>
-                  <span id="button-loading" class="spinner-border spinner-border-sm mt-1 mr-1" style="display:none" role="status" aria-hidden="true"></span>
+          <div class="d-flex flex-column">
+            <div class="input-group">
+                <span class="input-group-text">
+                  <select v-model="chain" @change="onChange()">
+                    <option v-for="c in conf.blockchains">{{c}}</option>
+                  </select>
                 </span>
-               <span class="sr-only">Request Token</span>
+                <input id="address" class="form-control" :placeholder="addressPlaceholder" v-model="address" name="address">
+                <button type="button" class="btn btn-secondary d-flex flex-row " @click="requestToken(this)">
+                  <span>
+                    <span id="address-button-loading" class="spinner-border spinner-border-sm mt-1 mr-1" style="display:none" role="status" aria-hidden="true"></span>
+                  </span>
+                <span class="sr-only">Request Token</span>
+                </button>
+            </div>
+            <div id="message" v-html="message"></div>
+          </div>
+
+          <div class="d-flex flex-column" style="margin-top: 200px;">
+            <div class="fs-5 pb-4">Check request status</div>
+            <div class="input-group">
+              <input id="request-id" class="form-control" :placeholder="requestIdPlaceholder" v-model="requestId" name="requestId">
+              <button type="button" class="btn btn-secondary d-flex flex-row " @click="checkRequestStatus(this)">
+                <span>
+                  <span id="request-id-button-loading" class="spinner-border spinner-border-sm mt-1 mr-1" style="display:none" role="status" aria-hidden="true"></span>
+                </span>
+              <span class="sr-only">Check status</span>
               </button>
+            </div>
+            <div id="reqStatusMessage" v-html="reqStatusMessage"></div>
           </div>
         </div>
-  
-        <div id="message" v-html="message"></div>
-  
       </main>
     
       <footer class="my-5 pt-5 text-muted text-center text-small">
@@ -55,6 +69,7 @@
         data() {
           return {
             message: '',
+            reqStatusMessage: '',
             testnet: 'Ping Testnet',
             logo: 'https://ping.pub/logo.svg',
             deployer: '',
@@ -74,11 +89,18 @@
           });
         },
         computed: {
-          placeholder() {
+          addressPlaceholder() {
             if(this.conf.sample) {
               return `Input an address (e.g.: ${this.conf.sample[this.chain]}) to received tokens`
             } else {
               return 'Input an address to received tokens'
+            }
+          },
+          requestIdPlaceholder() {
+            if(this.conf.sample) {
+              return `Input a previous faucet request id (e.g.: 08e010b9-bb2d-42...) to check its status`
+            } else {
+              return 'Input your faucet request id'
             }
           },
           faucet() {
@@ -96,7 +118,7 @@
             if (this.address) {
               // button state
               obj.disabled = true;
-              document.getElementById("button-loading").style.display = 'block';
+              document.getElementById("address-button-loading").style.display = 'block';
 
               try {
                 const response = await fetch(`/send/${this.chain}/${this.address}`);
@@ -104,7 +126,7 @@
 
                 // button state
                 obj.disabled = false;
-                document.getElementById("button-loading").style.display = 'none';
+                document.getElementById("address-button-loading").style.display = 'none';
                 // show result
                 this.message = `
                 <div class="alert alert-success alert-dismissible show fade mt-2" role="alert">
@@ -122,10 +144,75 @@
               } finally {
                 // button state
                 obj.disabled = false;
-                document.getElementById("button-loading").style.display = 'none';
+                document.getElementById("address-button-loading").style.display = 'none';
               }
             } else {
               this.message = '<span class="text-danger">Address is required</span>';
+            }
+          },
+          async checkRequestStatus(obj) {
+            if (this.requestId) {
+              // button state
+              obj.disabled = true;
+              document.getElementById("request-id-button-loading").style.display = 'block';
+
+              try {
+                const response = {status: 200}
+                // await fetch(`/status/${this.requestId}`);
+
+                if (response.status === 404) {
+                  this.reqStatusMessage = `
+                  <div class="alert alert-danger alert-dismissible show fade mt-2" role="alert">
+                    <li>Request ID not found</li>
+                  </div>
+                  `;
+                  return;
+                }
+                
+                // parse response
+                const data = await response.json();
+
+                // failed status
+                if ((!!data.data?.code && data.data.code !== 0) || data.statuses.includes("error") || data.statuses.includes("failed")) {
+                  this.reqStatusMessage = `
+                  <div class="alert alert-danger alert-dismissible show fade mt-2" role="alert">
+                    <li>Status: ${data.messsage || "Request failed, please contact the admin."}</li>
+                  </div>
+                  `;
+                  return;
+                }
+
+                // success status
+                if (data.statuses.includes("success")) {
+                  this.reqStatusMessage = `
+                  <div class="alert alert-success alert-dismissible show fade mt-2" role="alert">
+                    <li>Status: ${data.messsage || "Request processed successfully"}</li>
+                  </div>
+                  `;
+                  return;
+                }
+                
+                // show result
+                this.reqStatusMessage = `
+                <div class="alert alert-warning alert-dismissible show fade mt-2" role="alert">
+                  <li>Status: ${data.messsage || "The request is currently being processed."}</li>
+                </div>
+                `;
+              } catch (e) {
+                console.log(e)
+                // show request failed message
+                this.reqStatusMessage = `
+                  <div class="alert alert-danger alert-dismissible show fade mt-2" role="alert">
+                    <li>Request failed</li>
+                  </div>
+                `; 
+              } finally {
+                // button state
+                obj.disabled = false;
+                document.getElementById("request-id-button-loading").style.display = 'none';
+              }
+            } else {
+              this.reqStatusMessage = '<span class="text-danger">Request ID is required</span>';
             }
           }
         }
