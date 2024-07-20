@@ -157,8 +157,7 @@
               document.getElementById("request-id-button-loading").style.display = 'block';
 
               try {
-                const response = {status: 200}
-                // await fetch(`/status/${this.requestId}`);
+                const response = await fetch(`/status/${this.requestId}`);
 
                 if (response.status === 404) {
                   this.reqStatusMessage = `
