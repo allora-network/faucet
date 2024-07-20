@@ -39,13 +39,13 @@
             <div id="message" v-html="message"></div>
           </div>
 
-          <div class="d-flex flex-column" style="margin-top: 200px;">
-            <div class="fs-5 pb-4">Check request status</div>
+          <div class="d-flex flex-column" style="margin-top: 100px;">
+            <div class="fs-5 pb-4">Check faucet processing status</div>
             <div class="input-group">
-              <input id="request-id" class="form-control" :placeholder="requestIdPlaceholder" v-model="requestId" name="requestId">
+              <input id="address-request" class="form-control" :placeholder="addressRequestPlaceholder" v-model="addressRequest" name="addressRequest">
               <button type="button" class="btn btn-secondary d-flex flex-row " @click="checkRequestStatus(this)">
                 <span>
-                  <span id="request-id-button-loading" class="spinner-border spinner-border-sm mt-1 mr-1" style="display:none" role="status" aria-hidden="true"></span>
+                  <span id="address-request-button-loading" class="spinner-border spinner-border-sm mt-1 mr-1" style="display:none" role="status" aria-hidden="true"></span>
                 </span>
               <span class="sr-only">Check status</span>
               </button>
@@ -57,7 +57,7 @@
     
       <footer class="my-5 pt-5 text-muted text-center text-small">
         <p class="my-2"> Faucet Address: {{ faucet }}, <br> Balance: {{ balance.amount }} {{balance.denom}}</p>
-        <p class="mb-1">&copy; 2022 Deployed By <%- project.deployer%></p>
+        <p class="mb-1">&copy; 2024 Deployed By <%- project.deployer%></p>
         <ul class="list-inline">
           <li class="list-inline-item"><a href="https://github.com/ping-pub/faucet.git">Deploy a new instance?</a></li>
         </ul>
@@ -96,12 +96,8 @@
               return 'Input an address to received tokens'
             }
           },
-          requestIdPlaceholder() {
-            if(this.conf.sample) {
-              return `Input a previous faucet request id (e.g.: 08e010b9-bb2d-42...) to check its status`
-            } else {
-              return 'Input your faucet request id'
-            }
+          addressRequestPlaceholder() {
+            return `Input your address to check its status in the faucet processing queue`
           },
           faucet() {
             return this.conf.sample? this.conf.sample[this.chain] : ''
@@ -151,52 +147,38 @@
             }
           },
           async checkRequestStatus(obj) {
-            if (this.requestId) {
+            if (this.addressRequest) {
               // button state
               obj.disabled = true;
-              document.getElementById("request-id-button-loading").style.display = 'block';
+              document.getElementById("address-request-button-loading").style.display = 'block';
 
               try {
-                const response = await fetch(`/status/${this.requestId}`);
-
-                if (response.status === 404) {
-                  this.reqStatusMessage = `
-                  <div class="alert alert-danger alert-dismissible show fade mt-2" role="alert">
-                    <li>Request ID not found</li>
-                  </div>
-                  `;
-                  return;
-                }
-                
+                const response = await fetch(`/status/${this.addressRequest}`);                
                 // parse response
                 const data = await response.json();
-
-                // failed status
-                if ((!!data.data?.code && data.data.code !== 0) || data.statuses.includes("error") || data.statuses.includes("failed")) {
-                  this.reqStatusMessage = `
-                  <div class="alert alert-danger alert-dismissible show fade mt-2" role="alert">
-                    <li>Status: ${data.messsage || "Request failed, please contact the admin."}</li>
-                  </div>
-                  `;
-                  return;
+                switch (data.status.toLowerCase()) {
+                  case "cleared":
+                    this.reqStatusMessage = `
+                    <div class="alert alert-success alert-dismissible show fade mt-2" role="alert">
+                      <li>Status: address request completed, ready for new request.</li>
+                    </div>
+                    `;
+                    break;
+                  case "completed":
+                    this.reqStatusMessage = `
+                    <div class="alert alert-success alert-dismissible show fade mt-2" role="alert">
+                      <li>Status: address processed and tokens sent.</li>
+                    </div>
+                    `;
+                    break;
+                  default:
+                    this.reqStatusMessage = `
+                    <div class="alert alert-warning alert-dismissible show fade mt-2" role="alert">
+                      <li>Status: address not yet processed, possibly in queue.</li>
+                    </div>
+                    `;
+                    break;
                 }
-
-                // success status
-                if (data.statuses.includes("success")) {
-                  this.reqStatusMessage = `
-                  <div class="alert alert-success alert-dismissible show fade mt-2" role="alert">
-                    <li>Status: ${data.messsage || "Request processed successfully"}</li>
-                  </div>
-                  `;
-                  return;
-                }
-                
-                // show result
-                this.reqStatusMessage = `
-                <div class="alert alert-warning alert-dismissible show fade mt-2" role="alert">
-                  <li>Status: ${data.messsage || "The request is currently being processed."}</li>
-                </div>
-                `;
               } catch (e) {
                 console.log(e)
                 // show request failed message
@@ -208,10 +190,10 @@
               } finally {
                 // button state
                 obj.disabled = false;
-                document.getElementById("request-id-button-loading").style.display = 'none';
+                document.getElementById("address-request-button-loading").style.display = 'none';
               }
             } else {
-              this.reqStatusMessage = '<span class="text-danger">Request ID is required</span>';
+              this.reqStatusMessage = '<span class="text-danger">Address is required</span>';
             }
           }
         }
