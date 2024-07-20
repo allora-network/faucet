@@ -79,6 +79,7 @@
             conf: {},
             balance: {},
             ethAddr: '0xxxx',
+            reCapchaSiteKey: '6LfJrRQqAAAAAMtTwRYMPUcmzZ4N04QIyPQWgmgO', 
           }
         },
         created() {
@@ -113,7 +114,7 @@
           },
           async requestToken(obj) {
             grecaptcha.ready(() => {
-              grecaptcha.execute('6LfJrRQqAAAAAMtTwRYMPUcmzZ4N04QIyPQWgmgO', {action: 'submit'}).then(async (token) => {
+              grecaptcha.execute(this.reCapchaSiteKey, {action: 'submit'}).then(async (token) => {
                 // Add your logic to submit to your backend server here.
                 if (this.address) {
                   // button state
@@ -153,54 +154,58 @@
             });
           },
           async checkRequestStatus(obj) {
-            if (this.addressRequest) {
-              // button state
-              obj.disabled = true;
-              document.getElementById("address-request-button-loading").style.display = 'block';
+            grecaptcha.ready(() => {
+              grecaptcha.execute(this.reCapchaSiteKey, {action: 'submit'}).then(async (token) => {
+                if (this.addressRequest) {
+                  // button state
+                  obj.disabled = true;
+                  document.getElementById("address-request-button-loading").style.display = 'block';
 
-              try {
-                const response = await fetch(`/status/${this.addressRequest}`);                
-                // parse response
-                const data = await response.json();
-                switch (data.status.toLowerCase()) {
-                  case "cleared":
+                  try {
+                    const response = await fetch(`/status/${this.addressRequest}`);                
+                    // parse response
+                    const data = await response.json();
+                    switch (data.status.toLowerCase()) {
+                      case "cleared":
+                        this.reqStatusMessage = `
+                        <div class="alert alert-success alert-dismissible show fade mt-2" role="alert">
+                          <li>Status: address request completed, ready for new request.</li>
+                        </div>
+                        `;
+                        break;
+                      case "completed":
+                        this.reqStatusMessage = `
+                        <div class="alert alert-success alert-dismissible show fade mt-2" role="alert">
+                          <li>Status: address processed and tokens sent.</li>
+                        </div>
+                        `;
+                        break;
+                      default:
+                        this.reqStatusMessage = `
+                        <div class="alert alert-warning alert-dismissible show fade mt-2" role="alert">
+                          <li>Status: address not yet processed, possibly in queue.</li>
+                        </div>
+                        `;
+                        break;
+                    }
+                  } catch (e) {
+                    console.log(e)
+                    // show request failed message
                     this.reqStatusMessage = `
-                    <div class="alert alert-success alert-dismissible show fade mt-2" role="alert">
-                      <li>Status: address request completed, ready for new request.</li>
-                    </div>
-                    `;
-                    break;
-                  case "completed":
-                    this.reqStatusMessage = `
-                    <div class="alert alert-success alert-dismissible show fade mt-2" role="alert">
-                      <li>Status: address processed and tokens sent.</li>
-                    </div>
-                    `;
-                    break;
-                  default:
-                    this.reqStatusMessage = `
-                    <div class="alert alert-warning alert-dismissible show fade mt-2" role="alert">
-                      <li>Status: address not yet processed, possibly in queue.</li>
-                    </div>
-                    `;
-                    break;
+                      <div class="alert alert-danger alert-dismissible show fade mt-2" role="alert">
+                        <li>Request failed</li>
+                      </div>
+                    `; 
+                  } finally {
+                    // button state
+                    obj.disabled = false;
+                    document.getElementById("address-request-button-loading").style.display = 'none';
+                  }
+                } else {
+                  this.reqStatusMessage = '<span class="text-danger">Address is required</span>';
                 }
-              } catch (e) {
-                console.log(e)
-                // show request failed message
-                this.reqStatusMessage = `
-                  <div class="alert alert-danger alert-dismissible show fade mt-2" role="alert">
-                    <li>Request failed</li>
-                  </div>
-                `; 
-              } finally {
-                // button state
-                obj.disabled = false;
-                document.getElementById("address-request-button-loading").style.display = 'none';
-              }
-            } else {
-              this.reqStatusMessage = '<span class="text-danger">Address is required</span>';
-            }
+              })
+            });
           }
         }
       }).mount('#app')
