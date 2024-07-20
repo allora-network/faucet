@@ -9,6 +9,7 @@
     <meta name="description" content="Uniform Faucet Tool For Cosmos SDK Blockchains - Powered By Ping.pub">
     <meta></head>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-Zenh87qX5JnK2Jl0vWa8Ck2rdkQ2Bzep5IDxbcnCeuOxjzrPF/et3URy9Bv1WTRi" crossorigin="anonymous">
+    <script src="https://www.google.com/recaptcha/api.js?render=6LfJrRQqAAAAAMtTwRYMPUcmzZ4N04QIyPQWgmgO"></script>
   </head>
   <body>
     <div id="app">
@@ -29,7 +30,7 @@
                   </select>
                 </span>
                 <input id="address" class="form-control" :placeholder="addressPlaceholder" v-model="address" name="address">
-                <button type="button" class="btn btn-secondary d-flex flex-row " @click="requestToken(this)">
+                <button type="button" class="btn btn-secondary d-flex flex-row" @click="requestToken(this)">
                   <span>
                     <span id="address-button-loading" class="spinner-border spinner-border-sm mt-1 mr-1" style="display:none" role="status" aria-hidden="true"></span>
                   </span>
@@ -111,40 +112,45 @@
             })
           },
           async requestToken(obj) {
-            if (this.address) {
-              // button state
-              obj.disabled = true;
-              document.getElementById("address-button-loading").style.display = 'block';
+            grecaptcha.ready(() => {
+              grecaptcha.execute('6LfJrRQqAAAAAMtTwRYMPUcmzZ4N04QIyPQWgmgO', {action: 'submit'}).then(async (token) => {
+                // Add your logic to submit to your backend server here.
+                if (this.address) {
+                  // button state
+                  obj.disabled = true;
+                  document.getElementById("address-button-loading").style.display = 'block';
 
-              try {
-                const response = await fetch(`/send/${this.chain}/${this.address}`);
-                const data = await response.json();
+                  try {
+                    const response = await fetch(`/send/${this.chain}/${this.address}`);
+                    const data = await response.json();
 
-                // button state
-                obj.disabled = false;
-                document.getElementById("address-button-loading").style.display = 'none';
-                // show result
-                this.message = `
-                <div class="alert alert-${data.code === 0 ? 'success' : 'danger'} alert-dismissible show fade mt-2" role="alert">
-                  <li>${data.message}</li>
-                </div>
-                `;
-              } catch (e) {
-                console.log(e)
-                // show request failed message
-                this.message = `
-                  <div class="alert alert-danger alert-dismissible show fade mt-2" role="alert">
-                    <li>Request failed</li>
-                  </div>
-                `;
-              } finally {
-                // button state
-                obj.disabled = false;
-                document.getElementById("address-button-loading").style.display = 'none';
-              }
-            } else {
-              this.message = '<span class="text-danger">Address is required</span>';
-            }
+                    // button state
+                    obj.disabled = false;
+                    document.getElementById("address-button-loading").style.display = 'none';
+                    // show result
+                    this.message = `
+                    <div class="alert alert-${data.code === 0 ? 'success' : 'danger'} alert-dismissible show fade mt-2" role="alert">
+                      <li>${data.message}</li>
+                    </div>
+                    `;
+                  } catch (e) {
+                    console.log(e)
+                    // show request failed message
+                    this.message = `
+                      <div class="alert alert-danger alert-dismissible show fade mt-2" role="alert">
+                        <li>Request failed</li>
+                      </div>
+                    `;
+                  } finally {
+                    // button state
+                    obj.disabled = false;
+                    document.getElementById("address-button-loading").style.display = 'none';
+                  }
+                } else {
+                  this.message = '<span class="text-danger">Address is required</span>';
+                }
+              });
+            });
           },
           async checkRequestStatus(obj) {
             if (this.addressRequest) {
