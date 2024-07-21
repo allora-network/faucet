@@ -1,9 +1,8 @@
 import { stringToPath } from '@cosmjs/crypto'
 import fs from 'fs'
-import { Wallet, utils } from 'ethers';
 
-// const mnemonic_path= './secret/{{.rootValues.alloraAccountSecretName}}'
-const mnemonic = "varioy"
+const mnemonic_path= "config/secret/mnemonic"
+const mnemonic = fs.readFileSync(mnemonic_path, 'utf8').trim()
 console.log("==================================================================")
 console.log(`faucet mnemonic: ${mnemonic.substring(1, 15)} ...`)
 

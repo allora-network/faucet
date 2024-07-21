@@ -7,8 +7,11 @@
     <link rel="icon" href="https://s3.amazonaws.com/assets.allora.network/favicon.ico" />
     <meta name=”robots” content="index, follow">
     <meta name="description" content="Uniform Faucet Tool For Cosmos SDK Blockchains - Powered By Ping.pub">
+    <link rel="preconnect" href="https://www.google.com">
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
     <meta></head>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-Zenh87qX5JnK2Jl0vWa8Ck2rdkQ2Bzep5IDxbcnCeuOxjzrPF/et3URy9Bv1WTRi" crossorigin="anonymous">
+    <script async src="https://www.google.com/recaptcha/api.js?render=6LeGtRQqAAAAAK7tMpJVYzioy14_m81K-WvLjZba"></script>
   </head>
   <body>
     <div id="app">
@@ -29,7 +32,7 @@
                   </select>
                 </span>
                 <input id="address" class="form-control" :placeholder="addressPlaceholder" v-model="address" name="address">
-                <button type="button" class="btn btn-secondary d-flex flex-row" @click="requestToken(this)">
+                <button id="tokens-request-button" type="button" class="btn btn-secondary d-flex flex-row g-recaptcha" :data-sitekey="reCapchaSiteKey" data-callback="onSubmitRequestToken">
                   <span>
                     <span id="address-button-loading" class="spinner-border spinner-border-sm mt-1 mr-1" style="display:none" role="status" aria-hidden="true"></span>
                   </span>
@@ -37,20 +40,6 @@
                 </button>
             </div>
             <div id="message" v-html="message"></div>
-          </div>
-
-          <div class="d-flex flex-column" style="margin-top: 100px;">
-            <div class="fs-5 pb-4">Check faucet processing status</div>
-            <div class="input-group">
-              <input id="address-request" class="form-control" :placeholder="addressRequestPlaceholder" v-model="addressRequest" name="addressRequest">
-              <button type="button" class="btn btn-secondary d-flex flex-row " @click="checkRequestStatus(this)">
-                <span>
-                  <span id="address-request-button-loading" class="spinner-border spinner-border-sm mt-1 mr-1" style="display:none" role="status" aria-hidden="true"></span>
-                </span>
-              <span class="sr-only">Check status</span>
-              </button>
-            </div>
-            <div id="reqStatusMessage" v-html="reqStatusMessage"></div>
           </div>
         </div>
       </main>
@@ -65,7 +54,17 @@
     </div>
     <script type="module">
       import { createApp } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js'
-      createApp({
+
+      window.onSubmitRequestToken = function(token) {
+        try {
+          window.app.requestToken(token);
+        } finally {
+          // enseure recaptcha widget reset to allow multiple attemts to submit the form
+          grecaptcha.reset();
+        }
+      }
+
+      window.app = createApp({
         data() {
           return {
             message: '',
@@ -78,7 +77,7 @@
             conf: {},
             balance: {},
             ethAddr: '0xxxx',
-            reCapchaSiteKey: '6LfJrRQqAAAAAMtTwRYMPUcmzZ4N04QIyPQWgmgO', 
+            reCapchaSiteKey: '6LeGtRQqAAAAAK7tMpJVYzioy14_m81K-WvLjZba', 
           }
         },
         created() {
@@ -111,91 +110,70 @@
               this.balance = balance
             })
           },
-          async requestToken(obj) {
-              // Add your logic to submit to your backend server here.
-              if (this.address) {
-                // button state
-                obj.disabled = true;
-                document.getElementById("address-button-loading").style.display = 'block';
-
-                try {
-                  const response = await fetch(`/send/${this.chain}/${this.address}`);
-                  const data = await response.json();
-
-                  // button state
-                  obj.disabled = false;
-                  document.getElementById("address-button-loading").style.display = 'none';
-                  // show result
-                  this.message = `
-                  <div class="alert alert-${data.code === 0 ? 'success' : 'danger'} alert-dismissible show fade mt-2" role="alert">
-                    <li>${data.message}</li>
-                  </div>
-                  `;
-                } catch (e) {
-                  console.log(e)
-                  // show request failed message
-                  this.message = `
-                    <div class="alert alert-danger alert-dismissible show fade mt-2" role="alert">
-                      <li>Request failed</li>
-                    </div>
-                  `;
-                } finally {
-                  // button state
-                  obj.disabled = false;
-                  document.getElementById("address-button-loading").style.display = 'none';
-                }
-              } else {
-                this.message = '<span class="text-danger">Address is required</span>';
-              }
+          async fetchAddressStatus(address) {
+            const response = await fetch(`/status/${address}`);
+            const data = await response.json();
+            return data
           },
-          async checkRequestStatus(obj) {
-            if (this.addressRequest) {
-              // button state
-              obj.disabled = true;
-              document.getElementById("address-request-button-loading").style.display = 'block';
+          async requestToken(captcha_token) {
+            const obj = document.getElementById("tokens-request-button");
+            if (!this.address) {
+              this.message = '<span class="text-danger">Address is required</span>';
+              return;  
+            }
 
-              try {
-                const response = await fetch(`/status/${this.addressRequest}`);                
-                // parse response
-                const data = await response.json();
-                switch (data.status.toLowerCase()) {
-                  case "cleared":
-                    this.reqStatusMessage = `
-                    <div class="alert alert-success alert-dismissible show fade mt-2" role="alert">
-                      <li>Status: address request completed, ready for new request.</li>
-                    </div>
-                    `;
-                    break;
-                  case "completed":
-                    this.reqStatusMessage = `
-                    <div class="alert alert-success alert-dismissible show fade mt-2" role="alert">
-                      <li>Status: address processed and tokens sent.</li>
-                    </div>
-                    `;
-                    break;
-                  default:
-                    this.reqStatusMessage = `
-                    <div class="alert alert-warning alert-dismissible show fade mt-2" role="alert">
-                      <li>Status: address queued for processing.</li>
-                    </div>
-                    `;
-                    break;
-                }
-              } catch (e) {
-                console.log(e)
-                // show request failed message
-                this.reqStatusMessage = `
-                  <div class="alert alert-danger alert-dismissible show fade mt-2" role="alert">
-                    <li>Request failed</li>
-                  </div>
-                `; 
-              } finally {
-                // button state
-                obj.disabled = false;
-                document.getElementById("address-request-button-loading").style.display = 'none';
+            // button state
+            obj.disabled = true;
+            document.getElementById("address-button-loading").style.display = 'block';
+
+            try {
+              // validate address
+              if (!this.address.startsWith(this.conf.addressPrefix) && !this.address.startsWith('0x')) {
+                this.message = `
+                <div class="alert alert-danger alert-dismissible show fade mt-2" role="alert">
+                  <li>Address '${this.address}' is not supported.</li>
+                </div>
+                `;
+                return;
               }
-            } else {
-              this.reqStatusMessage = '<span class="text-danger">Address is required</span>';
+              
+              // address is cleared, proceed to send tokens
+              const response = await fetch('/send', {
+                method: 'POST', 
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ chain: this.chain, address: this.address, recapcha_token: captcha_token }) // Convert the request body to a JSON string
+              })
+              const data = await response.json();
+              
+              if (response.status !== 201) {
+                const alertClass = response.status >= 200 && response.status < 300  ? 'alert-warning' : 'alert-danger'; 
+                this.message = `
+                <div class="alert ${alertClass} alert-dismissible show fade mt-2" role="alert">
+                  <li>${data.message}</li>
+                </div>
+                `;
+                return;
+              }
+              // show result
+              this.message = `
+              <div class="alert alert-${data.code === 0 ? 'success' : 'danger'} alert-dismissible show fade mt-2" role="alert">
+                <li>${data.message}</li>
+              </div>
+              `;
+            } catch (e) {
+              console.log(e)
+              // show request failed message
+              this.message = `
+                <div class="alert alert-danger alert-dismissible show fade mt-2" role="alert">
+                  <li>Request failed</li>
+                </div>
+              `;
+            } finally {
+              // button state
+              obj.disabled = false;
+              document.getElementById("address-button-loading").style.display = 'none';
             }
           }
         }
