@@ -128,7 +128,7 @@ app.get('/status/:address', async (req, res, next) => {
 
     let status = await checker.get(statusAddress);
     if (!status) {
-      status = queue.includes("pending") && 'not found';
+      status = queue.includes(statusAddress) ? "pending" : 'not found';
     }
     res.json({ code: 0, status });
 
