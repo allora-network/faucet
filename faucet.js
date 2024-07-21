@@ -11,11 +11,19 @@ import { SigningStargateClient } from "@cosmjs/stargate";
 
 import conf from './config/config.js'
 import { FrequencyChecker } from './checker.js';
+import * as dotenv from 'dotenv';
 
+// Load environment variables
+dotenv.config();
+console.log(process.env.RECAPTCHA_SECRET)
 // load config
 console.log("loaded config: ", conf)
 
 const app = express()
+
+// Middleware to parse JSON bodies
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 app.set("view engine", "ejs");
 
@@ -121,28 +129,16 @@ app.get('/balance/:chain', async (req, res) => {
   res.send(balance);
 })
 
-app.get('/status/:address', async (req, res, next) => {
+app.post('/send', async (req, res, next) => {
   return Promise.resolve().then(async () => {
-    const { address } = req.params;
-    const statusAddress = `status:${address}`;
-
-    let status = await checker.get(statusAddress);
-    if (!status) {
-      status = queue.includes(statusAddress) ? "pending" : 'not found';
+    const {chain, address, recapcha_token} = req.body;
+    // Verify recaptcha
+    const recaptchaVerification = await getRecaptchaVerification(recapcha_token);
+    if (!recaptchaVerification.success) {
+      return res.status(401).json({ code: 1, message: 'Recaptcha verification failed' });
     }
-    res.json({ code: 0, status });
 
-    if (status === 'Completed') {
-      addressStatus[statusAddress] = 'cleared';
-      await checker.put(statusAddress, 'cleared');
-    }
-  }).catch(next)
-});
-
-app.get('/send/:chain/:address', async (req, res, next) => {
-  return Promise.resolve().then(async () => {
-
-    const {chain, address} = req.params;
+    // Process request
     const ip = req.headers['x-real-ip'] || req.headers['X-Real-IP'] || req.headers['X-Forwarded-For'] || req.ip
     console.log('request tokens to ', address, ip)
     if (chain || address ) {
@@ -152,24 +148,24 @@ app.get('/send/:chain/:address', async (req, res, next) => {
           if( await checker.checkAddress(address, chain) && await checker.checkIp(`${chain}${ip}`, chain) ) {
             checker.update(`${chain}${ip}`) // get ::1 on localhost
 
-            const statusAddress = `status:${address}`
-            if (addressStatus[statusAddress] === 'Completed') {
-              console.log('Address has already received faucet');
-              return res.status(400).json({ code: 1, message: 'Address has already received faucet' });
+            const statusAddress = `status:${address}`;
+            if (queue.includes(statusAddress)) {
+              console.log('Address already in queue');
+              return res.status(200).json({ code: 0, message: 'Address already in the processing queue' });
             }
 
             await enqueueAddress(statusAddress);
-            res.json({ code: 0, message: 'Address enqueued for faucet processing.' });
+            res.status(201).json({ code: 0, message: 'Address enqueued for faucet processing.' });
 
             await checker.update(address)
 
           }else {
-            res.send({ code: 1, message: `Too many faucet requests sent for address '${address}'. Try again later.
+            res.status(429).send({ code: 1, message: `Too many faucet requests sent for address '${address}'. Try again later.
               \nLimits per 24h: ${chainConf.limit.address} times per address, ${chainConf.limit.ip} times per IP.
             `})
           }
         } else {
-          res.send({ code: 1, message: `Address '${address}' is not supported.`, recipient: address })
+          res.status(400).send({ code: 1, message: `Address '${address}' is not supported.`, recipient: address })
         }
       // } catch (err) {
       //   console.error(err);
@@ -178,7 +174,7 @@ app.get('/send/:chain/:address', async (req, res, next) => {
 
     } else {
       // send result
-      res.send({ code: 0, message: 'address is required' });
+      res.status(400).send({ code: 0, message: 'address is required' });
     }}).catch(next)
 })
 
@@ -190,6 +186,14 @@ app.use((err, req, res) => {
 app.listen(conf.port, () => {
   console.log(`Faucet app listening on port ${conf.port}`)
 })
+
+async function getRecaptchaVerification(token) {
+  const secret = process.env.RECAPTCHA_SECRET;
+  const response = await fetch(`https://www.google.com/recaptcha/api/siteverify?secret=${secret}&response=${token}`, {
+    method: 'POST',
+  });
+  return response.json();
+}
 
 async function sendCosmosTx(recipient, chain) {
   console.log("sendCosmosTx", recipient, chain)
