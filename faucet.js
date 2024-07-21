@@ -46,6 +46,7 @@ app.get('/config.json', async (req, res) => {
   const project = conf.project
   project.sample = sample
   project.blockchains = conf.blockchains.map(x => x.name)
+  project.addressPrefix = conf.blockchains[0].sender.option.prefix
   res.send(project);
 })
 
@@ -127,11 +128,11 @@ app.get('/status/:address', async (req, res, next) => {
 
     let status = await checker.get(statusAddress);
     if (!status) {
-      status = 'not found';
+      status = queue.includes("pending") && 'not found';
     }
     res.json({ code: 0, status });
 
-    if (status != 'not found') {
+    if (status === 'Completed') {
       addressStatus[statusAddress] = 'cleared';
       await checker.put(statusAddress, 'cleared');
     }
@@ -158,15 +159,17 @@ app.get('/send/:chain/:address', async (req, res, next) => {
             }
 
             await enqueueAddress(statusAddress);
-            res.json({ code: 0, message: 'Address enqueued for faucet processing. Please check status with your address' });
+            res.json({ code: 0, message: 'Address enqueued for faucet processing.' });
 
             await checker.update(address)
 
           }else {
-            res.send({ code: 1, message: 'Too Many Requests'})
+            res.send({ code: 1, message: `Too many faucet requests sent for address '${address}'. Try again later.
+              \nLimits per 24h: ${chainConf.limit.address} times per address, ${chainConf.limit.ip} times per IP.
+            `})
           }
         } else {
-          res.send({ code: 1, message: `Address [${address}] is not supported.`, recipient: address })
+          res.send({ code: 1, message: `Address '${address}' is not supported.`, recipient: address })
         }
       // } catch (err) {
       //   console.error(err);
