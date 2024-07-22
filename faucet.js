@@ -15,7 +15,6 @@ import * as dotenv from 'dotenv';
 
 // Load environment variables
 dotenv.config();
-console.log(process.env.RECAPTCHA_SECRET)
 // load config
 console.log("loaded config: ", conf)
 
@@ -149,6 +148,12 @@ app.post('/send', async (req, res, next) => {
             checker.update(`${chain}${ip}`) // get ::1 on localhost
 
             const statusAddress = `status:${address}`;
+            if (addressStatus[statusAddress] === 'Completed') {
+              addressStatus[statusAddress] = 'cleared';
+              await checker.put(statusAddress, 'cleared');
+              return res.status(200).json({ code: 0, message: 'Your previous faucet request has been processed. You can now submit a new request.' });
+            }
+
             if (queue.includes(statusAddress)) {
               console.log('Address already in queue');
               return res.status(200).json({ code: 0, message: 'Address already in the processing queue' });
