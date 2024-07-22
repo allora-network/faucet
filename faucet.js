@@ -172,6 +172,7 @@ app.post('/send', async (req, res, next) => {
     const {chain, address, recapcha_token} = req.body;
     // Verify recaptcha
     const recaptchaVerification = await getRecaptchaVerification(recapcha_token);
+    console.log('recaptchaVerification response:', JSON.stringify(recaptchaVerification, null, 2));
     if (!recaptchaVerification.success) {
       return res.status(401).json({ code: 1, message: 'Recaptcha verification failed' });
     }
@@ -238,6 +239,7 @@ app.listen(conf.port, () => {
 
 async function getRecaptchaVerification(token) {
   const secret = process.env.RECAPTCHA_SECRET;
+  console.log("Fetching recaptcha verification:", `https://www.google.com/recaptcha/api/siteverify?secret=${secret}&response=${token}`)
   const response = await fetch(`https://www.google.com/recaptcha/api/siteverify?secret=${secret}&response=${token}`, {
     method: 'POST',
   });
