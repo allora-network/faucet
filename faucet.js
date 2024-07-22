@@ -84,7 +84,6 @@ const processAddresses = async (chain) => {
         console.log(error, 'error')
       }
       addressStatus[statusAddress] = 'Completed';
-      await checker.put(statusAddress, 'Completed');
     }
 
     console.log('Waiting for 5 seconds cooldown period');
@@ -190,7 +189,6 @@ app.post('/send', async (req, res, next) => {
             const statusAddress = `status:${address}`;
             if (addressStatus[statusAddress] === 'Completed') {
               addressStatus[statusAddress] = 'cleared';
-              await checker.put(statusAddress, 'cleared');
               return res.status(200).json({ code: 0, message: 'Your previous faucet request has been processed. You can now submit a new request.' });
             }
 
