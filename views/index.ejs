@@ -70,13 +70,14 @@
             conf: {},
             balance: {},
             ethAddr: '0xxxx',
-            reCapchaSiteKey: '6LeGtRQqAAAAAK7tMpJVYzioy14_m81K-WvLjZba', 
+            reCapchaSiteKey: '', 
           }
         },
         created() {
           fetch("/config.json").then(response => response.json()).then(data => {
             this.conf = data
             this.chain = data.blockchains[0]
+            this.reCapchaSiteKey = data.reCaptchaSiteKey
             // this.placeholder = `Input an address (e.g.: ${data.sample[this.chain]}) to received tokens`
             this.onChange();
           });
@@ -103,7 +104,7 @@
           initReCaptcha: function() {
               var self = this;
               setTimeout(function() {
-                  if(typeof grecaptcha === 'undefined') {
+                  if(typeof grecaptcha === 'undefined' || !self.reCapchaSiteKey) {
                       self.initReCaptcha();
                   }
                   else {

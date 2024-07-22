@@ -51,6 +51,7 @@ app.get('/config.json', async (req, res) => {
   project.sample = sample
   project.blockchains = conf.blockchains.map(x => x.name)
   project.addressPrefix = conf.blockchains[0].sender.option.prefix
+  project.reCaptchaSiteKey = conf.reCaptcha.siteKey
   res.send(project);
 })
 
@@ -235,7 +236,7 @@ app.listen(conf.port, () => {
 })
 
 async function getRecaptchaVerification(token) {
-  const secret = conf.recaptchaSecret;
+  const secret = conf.reCaptcha.secretKey;
   console.log("Fetching recaptcha verification:", `https://www.google.com/recaptcha/api/siteverify?secret=${secret}&response=${token}`)
   const response = await fetch(`https://www.google.com/recaptcha/api/siteverify?secret=${secret}&response=${token}`, {
     method: 'POST',

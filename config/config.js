@@ -54,5 +54,8 @@ export default {
         }
     },
     ],
-    recaptchaSecret: process.env.RECAPTCHA_SECRET
+    reCaptcha: {
+        siteKey: process.env.RECAPTCHA_SITE_KEY,
+        secretKey: process.env.RECAPTCHA_SECRET_KEY
+    }
 }
