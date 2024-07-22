@@ -128,6 +128,46 @@ app.get('/balance/:chain', async (req, res) => {
   res.send(balance);
 })
 
+const blocklist = new Set();
+const ipCounter = new Map();
+const TIME_WINDOW = 60000; // 1 minute in milliseconds
+const MAX_REQUESTS = 3; // Threshold for blocklisting
+
+const checkIpBlockList = async (ip) => {
+    const [firstOctet, secondOctet] = ip.split('.');
+    const ipPrefix = `${firstOctet}.${secondOctet}`;
+
+    // Check if the IP prefix is in the blocklist
+    if (blocklist.has(ipPrefix)) {
+      return true
+    }
+
+    const now = Date.now();
+
+    // Check and update IP counter
+    if (!ipCounter.has(ipPrefix)) {
+        ipCounter.set(ipPrefix, []);
+    }
+
+    const timestamps = ipCounter.get(ipPrefix);
+    timestamps.push(now);
+
+    // Remove timestamps older than 1 minute
+    while (timestamps.length > 0 && now - timestamps[0] > TIME_WINDOW) {
+        timestamps.shift();
+    }
+
+    // If more than 3 requests in the last minute, add to blocklist
+    if (timestamps.length > MAX_REQUESTS) {
+      blocklist.add(ipPrefix);
+      ipCounter.delete(ipPrefix);
+    } else {
+        ipCounter.set(ipPrefix, timestamps);
+    }
+
+    return false
+};
+
 app.post('/send', async (req, res, next) => {
   return Promise.resolve().then(async () => {
     const {chain, address, recapcha_token} = req.body;
@@ -159,8 +199,14 @@ app.post('/send', async (req, res, next) => {
               return res.status(200).json({ code: 0, message: 'Address already in the processing queue' });
             }
 
-            await enqueueAddress(statusAddress);
-            res.status(201).json({ code: 0, message: 'Address enqueued for faucet processing.' });
+            const ipBlocked = await checkIpBlockList(ip);
+            if (ipBlocked) {
+              console.log(`IP blocked - ${ip}`);
+              res.status(403).json({ code: 1, message: `IP added to blocklist.`});
+            } else {
+              await enqueueAddress(statusAddress);
+              res.status(201).json({ code: 0, message: 'Address enqueued for faucet processing.' });
+            }
 
             await checker.update(address)
 
