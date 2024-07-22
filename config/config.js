@@ -1,5 +1,9 @@
 import { stringToPath } from '@cosmjs/crypto'
 import fs from 'fs'
+import * as dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 const mnemonic_path= "config/secret/mnemonic"
 const mnemonic = fs.readFileSync(mnemonic_path, 'utf8').trim()
@@ -49,5 +53,6 @@ export default {
             ip: 20
         }
     },
-    ]
+    ],
+    recaptchaSecret: process.env.RECAPTCHA_SECRET
 }

@@ -11,10 +11,7 @@ import { SigningStargateClient } from "@cosmjs/stargate";
 
 import conf from './config/config.js'
 import { FrequencyChecker } from './checker.js';
-import * as dotenv from 'dotenv';
 
-// Load environment variables
-dotenv.config();
 // load config
 console.log("loaded config: ", conf)
 
@@ -238,7 +235,7 @@ app.listen(conf.port, () => {
 })
 
 async function getRecaptchaVerification(token) {
-  const secret = process.env.RECAPTCHA_SECRET;
+  const secret = conf.recaptchaSecret;
   console.log("Fetching recaptcha verification:", `https://www.google.com/recaptcha/api/siteverify?secret=${secret}&response=${token}`)
   const response = await fetch(`https://www.google.com/recaptcha/api/siteverify?secret=${secret}&response=${token}`, {
     method: 'POST',
