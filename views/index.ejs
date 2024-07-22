@@ -120,7 +120,6 @@
               grecaptcha.execute();
           },
           submitRequestToken: async function(captcha_token) {
-            console.log(captcha_token)
             try {
               await this.requestToken(captcha_token);
             } finally {

@@ -189,7 +189,7 @@ app.post('/send', async (req, res, next) => {
             const statusAddress = `status:${address}`;
             if (addressStatus[statusAddress] === 'Completed') {
               addressStatus[statusAddress] = 'cleared';
-              return res.status(200).json({ code: 0, message: 'Your previous faucet request has been processed. You can now submit a new request.' });
+              return res.status(201).json({ code: 0, message: 'Your previous faucet request has been processed. You can now submit a new request.' });
             }
 
             if (queue.includes(statusAddress)) {
