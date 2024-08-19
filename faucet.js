@@ -88,8 +88,9 @@ const processAddresses = async (chain) => {
       addressStatus[statusAddress] = 'Completed';
     }
 
-    console.log('Waiting for 5 seconds cooldown period');
-    await new Promise(resolve => setTimeout(resolve, 8000));
+    console.log(`Waiting for ${conf.blockchains[0].limit.cooldownInSec} seconds cooldown period`);
+    const coodownTime = conf.blockchains[0].limit.cooldownInSec * 1000;
+    await new Promise(resolve => setTimeout(resolve, coodownTime));
   }
 };
 
