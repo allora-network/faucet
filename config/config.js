@@ -6,9 +6,9 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 const mnemonic_path= "config/secret/mnemonic"
-const mnemonic = fs.readFileSync(mnemonic_path, 'utf8').trim()
+const mnemonics = fs.readFileSync(mnemonic_path, 'utf8').trim().split('\n');
 console.log("==================================================================")
-console.log(`faucet mnemonic: ${mnemonic.substring(1, 15)} ...`)
+console.log(`faucet mnemonic: ${mnemonics[0].substring(1, 15)} ...`)
 
 export default {
 
@@ -17,20 +17,20 @@ export default {
         "path": `./faucet.db` // db for frequency checker(WIP)
     },
     "project": {
-        "name": "Allora Edgenet", // What ever you want, recommend: chain-id, 
+        "name": "Allora Testnet", // What ever you want, recommend: chain-id, 
         "logo": "https://s3.amazonaws.com/assets.allora.network/logo.svg",
         "deployer": '<a href="https://allora.network">Allora</a>'
     },
     blockchains: [
     {
-        name: "edgenet",
+        name: "allora-testnet-1",
         endpoint: {
             // make sure that CORS is enabled in rpc section in config.toml
             // cors_allowed_origins = ["*"]
-            rpc_endpoint: "https://allora-rpc.edgenet.allora.network",
+            rpc_endpoint: "https://allora-rpc.testnet.allora.network",
         },
         sender: {
-            mnemonic,
+            mnemonics,
             option: {
                 hdPaths: [stringToPath("m/44'/118'/0'/0/0")],
                 prefix: "allo" // human readable address prefix

@@ -36,27 +36,31 @@ app.get('/', (req, res) => {
 })
 
 app.get('/config.json', async (req, res) => {
-  const sample = {}
-  for(let i =0; i < conf.blockchains.length; i++) {
-    const chainConf = conf.blockchains[i]
-    const wallet = await DirectSecp256k1HdWallet.fromMnemonic(chainConf.sender.mnemonic, chainConf.sender.option);
-    const [firstAccount] = await wallet.getAccounts();
-    sample[chainConf.name] = firstAccount.address
+  const sample = {};
+  for (let i = 0; i < conf.blockchains.length; i++) {
+    const chainConf = conf.blockchains[i];
+    const addresses = [];
 
-    const wallet2 = Wallet.fromMnemonic(chainConf.sender.mnemonic, pathToString(chainConf.sender.option.hdPaths[0]));
-    console.log('address:', firstAccount.address, wallet2.address)
+    for (const mnemonic of chainConf.sender.mnemonics) {
+      const wallet = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic, chainConf.sender.option);
+      const [firstAccount] = await wallet.getAccounts();
+      addresses.push(firstAccount.address);
+    }
+
+    sample[chainConf.name] = addresses;
   }
 
-  const project = conf.project
-  project.sample = sample
-  project.blockchains = conf.blockchains.map(x => x.name)
-  project.addressPrefix = conf.blockchains[0].sender.option.prefix
-  project.reCaptchaSiteKey = conf.reCaptcha.siteKey
+  const project = conf.project;
+  project.sample = sample;
+  project.blockchains = conf.blockchains.map(x => x.name);
+  project.addressPrefix = conf.blockchains[0].sender.option.prefix;
+  project.reCaptchaSiteKey = conf.reCaptcha.siteKey;
   res.send(project);
-})
+});
 
 const queue = [];
 const addressStatus = {};
+let mnemonicCounter = 0;
 
 // Enqueue address
 const enqueueAddress = async (statusAddress) => {
@@ -85,45 +89,38 @@ const processAddresses = async (chain) => {
     }
 
     console.log('Waiting for 5 seconds cooldown period');
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    await new Promise(resolve => setTimeout(resolve, 8000));
   }
 };
 
 processAddresses(conf.blockchains[0].name);
 
 app.get('/balance/:chain', async (req, res) => {
-  const { chain }= req.params
+  const { chain } = req.params;
+  let balances = [];
 
-  let balance = {}
+  try {
+    const chainConf = conf.blockchains.find(x => x.name === chain);
+    if (chainConf) {
+      const rpcEndpoint = chainConf.endpoint.rpc_endpoint;
 
-  try{
-    const chainConf = conf.blockchains.find(x => x.name === chain)
-    if(chainConf) {
-      if(chainConf.type === 'Ethermint') {
-        const ethProvider = new ethers.providers.JsonRpcProvider(chainConf.endpoint.evm_endpoint);
-        const wallet = Wallet.fromMnemonic(chainConf.sender.mnemonic, pathToString(chainConf.sender.option.hdPaths[0])).connect(ethProvider);
-        await wallet.getBalance().then(ethBlance => {
-          balance = {
-            denom:chainConf.tx.amount.denom,
-            amount:ethBlance.toString()
-          }
-        }).catch(e => console.error(e))
-
-      }else{
-        const rpcEndpoint = chainConf.endpoint.rpc_endpoint;
-        const wallet = await DirectSecp256k1HdWallet.fromMnemonic(chainConf.sender.mnemonic, chainConf.sender.option);
+      for (const mnemonic of chainConf.sender.mnemonics) {
+        const wallet = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic, chainConf.sender.option);
         const client = await SigningStargateClient.connectWithSigner(rpcEndpoint, wallet);
         const [firstAccount] = await wallet.getAccounts();
-        await client.getBalance(firstAccount.address, chainConf.tx.amount[0].denom).then(x => {
-          balance = x
-        }).catch(e => console.error(e));
+        
+        const balance = await client.getBalance(firstAccount.address, chainConf.tx.amount[0].denom);
+        balances.push({
+          address: firstAccount.address,
+          balance: balance
+        });
       }
     }
-  } catch(err) {
-    console.log(err)
+  } catch (err) {
+    console.log(err);
   }
-  res.send(balance);
-})
+  res.send(balances);
+});
 
 const blocklist = new Set();
 const ipCounter = new Map();
@@ -245,33 +242,40 @@ async function getRecaptchaVerification(token) {
 }
 
 async function sendCosmosTx(recipient, chain) {
-  console.log("sendCosmosTx", recipient, chain)
-  // const mnemonic = "surround miss nominee dream gap cross assault thank captain prosper drop duty group candy wealth weather scale put";
-  const chainConf = conf.blockchains.find(x => x.name === chain) 
-  if(chainConf) {
-    const wallet = await DirectSecp256k1HdWallet.fromMnemonic(chainConf.sender.mnemonic, chainConf.sender.option);
-    const [firstAccount] = await wallet.getAccounts();
+  console.log("sendCosmosTx", recipient, chain);
 
-    // console.log("sender", firstAccount);
+  const chainConf = conf.blockchains.find(x => x.name === chain);
+  if (chainConf) {
+    // Get the mnemonic to use and update the counter
+    const mnemonic = chainConf.sender.mnemonics[mnemonicCounter];
+    mnemonicCounter = (mnemonicCounter + 1) % chainConf.sender.mnemonics.length;
+
+    const wallet = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic, chainConf.sender.option);
+    const [firstAccount] = await wallet.getAccounts();
+    console.log(`using faucet ${firstAccount.address}`);
+
     const rpcEndpoint = chainConf.endpoint.rpc_endpoint;
     const client = await SigningStargateClient.connectWithSigner(rpcEndpoint, wallet);
-    // const recipient = "cosmos1xv9tklw7d82sezh9haa573wufgy59vmwe6xxe5";
+
     const amount = chainConf.tx.amount;
     const fee = chainConf.tx.fee;
-    const initialAccountBalance = await client.getBalance(recipient, chainConf.tx.amount[0].denom)
+    const initialAccountBalance = await client.getBalance(recipient, chainConf.tx.amount[0].denom);
+    
     try {
       return await client.sendTokens(firstAccount.address, recipient, amount, fee);
     } catch(e) {
-      const finalAccountBalance = await client.getBalance(recipient, chainConf.tx.amount[0].denom)
-      const diff = BigNumber.from(finalAccountBalance.amount).sub(BigNumber.from(initialAccountBalance.amount))
+      const finalAccountBalance = await client.getBalance(recipient, chainConf.tx.amount[0].denom);
+      const diff = BigNumber.from(finalAccountBalance.amount).sub(BigNumber.from(initialAccountBalance.amount));
       if (!diff.eq(BigNumber.from(amount[0].amount))) {
-        throw new Error(`Recipient balance did not increase by the expected amount. Error: ${e.message}`)
+        throw new Error(`Recipient balance did not increase by the expected amount. Error: ${e.message}`);
       }
     }
-    console.log(`Sent ${amount} tokens to ${recipient}`)
-    return {code: 0}
+    
+    console.log(`Sent ${amount[0].amount}${amount[0].denom} tokens to ${recipient}`);
+    return {code: 0};
   }
-  throw new Error(`Blockchain Config [${chain}] not found`)
+  
+  throw new Error(`Blockchain Config [${chain}] not found`);
 }
 
 async function sendEvmosTx(recipient, chain) {

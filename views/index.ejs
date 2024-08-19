@@ -47,7 +47,11 @@
       </main>
     
       <footer class="my-5 pt-5 text-muted text-center text-small">
-        <p class="my-2"> Faucet Address: {{ faucet }}, <br> Balance: {{ balance.amount }} {{balance.denom}}</p>
+        <div class="my-2">
+          <div v-for="balance in balances" :key="balance.address">
+            <p>Faucet Address: {{ balance.address }}, <br> Balance: {{ balance.balance.amount }} {{ balance.balance.denom }}</p>
+          </div>
+        </div>
         <p class="mb-1">&copy; 2024 Deployed By <%- project.deployer%></p>
         <ul class="list-inline">
           <li class="list-inline-item"><a href="https://github.com/ping-pub/faucet.git">Deploy a new instance?</a></li>
@@ -68,7 +72,7 @@
             address: '',
             chain: '',
             conf: {},
-            balance: {},
+            balances: [],
             ethAddr: '0xxxx',
             reCapchaSiteKey: '', 
           }
@@ -88,7 +92,7 @@
         computed: {
           addressPlaceholder() {
             if(this.conf.sample) {
-              return `Input an address (e.g.: ${this.conf.sample[this.chain]}) to received tokens`
+              return `Input an address (e.g.: ${this.conf.sample[this.chain][0]}) to received tokens`
             } else {
               return 'Input an address to received tokens'
             }
@@ -97,7 +101,7 @@
             return `Input your address to check its status in the faucet processing queue`
           },
           faucet() {
-            return this.conf.sample? this.conf.sample[this.chain] : ''
+            return this.conf.sample ? this.conf.sample[this.chain] : []
           }
         },
         methods: {
@@ -129,9 +133,9 @@
             }
           },
           onChange() {
-            this.balance = {} // reset balance
-            fetch(`/balance/${this.chain}`).then(r => r.json()).then(balance => {
-              this.balance = balance
+            this.balances = [] // reset balances
+            fetch(`/balance/${this.chain}`).then(r => r.json()).then(balances => {
+              this.balances = balances
             })
           },
           async fetchAddressStatus(address) {

@@ -3,6 +3,5 @@
 /db
 .idea
 secret
-config
 faucet.db
 .env
