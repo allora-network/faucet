@@ -27,7 +27,7 @@ export default {
         endpoint: {
             // make sure that CORS is enabled in rpc section in config.toml
             // cors_allowed_origins = ["*"]
-            rpc_endpoint: "https://allora-rpc.testnet.allora.network",
+            rpc_endpoint: "https://allora-rpc.testnet-1.testnet.allora.network/",
         },
         sender: {
             mnemonics,
@@ -51,7 +51,8 @@ export default {
             // how many times each ip is allowed in a window(24h),
             // if you use proxy, double check if the req.ip is return client's ip.
             ip: 20,
-            cooldownInSec: 1
+            cooldownInSec: 1,
+            processableAddresses: 100
         }
     },
     ],

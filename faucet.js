@@ -74,23 +74,33 @@ const enqueueAddress = async (statusAddress) => {
 
 // Process addresses
 const processAddresses = async (chain) => {
-  console.log('Starting to process addresses');
+  console.log('Starting to process addresses'); 
+
   while (true) {
-    console.log(`the lenght of the queue: ${queue.length}`);
+    console.log(`The length of the queue: ${queue.length}`);
+    
     if (queue.length > 0) {
-      const statusAddress = queue.shift();
-      const address = statusAddress.replace('status:', '');
-      try {
-        await sendTx(address, chain);
-      } catch (error) {
-        console.log(error, 'error')
+      const addressesToProcess = [];
+      for (let i = 0; i < conf.blockchains[0].limit.processableAddresses && queue.length > 0; i++) {
+        const statusAddress = queue.shift();
+        const address = statusAddress.replace('status:', '');
+        addressesToProcess.push(address);
       }
-      addressStatus[statusAddress] = 'Completed';
+      
+      try {
+        await sendCosmosTx(addressesToProcess, chain)
+        addressesToProcess.forEach(address => {
+          const statusAddress = `status:${address}`;
+          addressStatus[statusAddress] = 'Completed';
+        });
+      } catch (error) {
+        console.log(error, 'error');
+      }
     }
 
     console.log(`Waiting for ${conf.blockchains[0].limit.cooldownInSec} seconds cooldown period`);
-    const coodownTime = conf.blockchains[0].limit.cooldownInSec * 1000;
-    await new Promise(resolve => setTimeout(resolve, coodownTime));
+    const cooldownTime = conf.blockchains[0].limit.cooldownInSec * 1000;
+    await new Promise(resolve => setTimeout(resolve, cooldownTime));
   }
 };
 
@@ -242,8 +252,8 @@ async function getRecaptchaVerification(token) {
   return response.json();
 }
 
-async function sendCosmosTx(recipient, chain) {
-  console.log("sendCosmosTx", recipient, chain);
+async function sendCosmosTx(recipients, chain) {
+  console.log("sendCosmosTx", recipients, chain);
 
   const chainConf = conf.blockchains.find(x => x.name === chain);
   if (chainConf) {
@@ -256,24 +266,34 @@ async function sendCosmosTx(recipient, chain) {
     console.log(`using faucet ${firstAccount.address}`);
 
     const rpcEndpoint = chainConf.endpoint.rpc_endpoint;
-    const client = await SigningStargateClient.connectWithSigner(rpcEndpoint, wallet);
+    const client = await SigningStargateClient.connectWithSigner(rpcEndpoint, wallet, { gasPrice: "0.025uallo" });
 
     const amount = chainConf.tx.amount;
     const fee = chainConf.tx.fee;
-    const initialAccountBalance = await client.getBalance(recipient, chainConf.tx.amount[0].denom);
-    
+
+    const messages = recipients.map(recipient => ({
+      typeUrl: "/cosmos.bank.v1beta1.MsgSend",
+      value: {
+        fromAddress: firstAccount.address,
+        toAddress: recipient,
+        amount: amount,
+      },
+    }));
+    // console.log('stringMessage:', JSON.stringify(messages));
+
     try {
-      return await client.sendTokens(firstAccount.address, recipient, amount, fee);
-    } catch(e) {
-      const finalAccountBalance = await client.getBalance(recipient, chainConf.tx.amount[0].denom);
-      const diff = BigNumber.from(finalAccountBalance.amount).sub(BigNumber.from(initialAccountBalance.amount));
-      if (!diff.eq(BigNumber.from(amount[0].amount))) {
-        throw new Error(`Recipient balance did not increase by the expected amount. Error: ${e.message}`);
+      const txResult = await client.signAndBroadcast(firstAccount.address, messages, "auto");
+      
+      if (txResult.code !== 0) {
+        throw new Error(`Transaction failed with code ${txResult.code}: ${txResult.rawLog}`);
       }
+      
+      console.log(`Sent ${amount[0].amount}${amount[0].denom} tokens to ${recipients.length} addresses`);
+      return {code: 0};
+      
+    } catch (e) {
+      throw new Error(`Failed to send tokens. Error: ${e.message}`);
     }
-    
-    console.log(`Sent ${amount[0].amount}${amount[0].denom} tokens to ${recipient}`);
-    return {code: 0};
   }
   
   throw new Error(`Blockchain Config [${chain}] not found`);
@@ -322,14 +342,6 @@ function toHexString(bytes) {
   return bytes.reduce(
       (str, byte) => str + byte.toString(16).padStart(2, '0'),
       '');
-}
-
-async function sendTx(recipient, chain) {
-  const chainConf = conf.blockchains.find(x => x.name === chain)
-  if(chainConf.type === 'Ethermint') {
-    return sendEvmosTx(recipient, chain)
-  }
-  return sendCosmosTx(recipient, chain)
 }
 
 // write a function to send evmos transaction
