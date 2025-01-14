@@ -176,11 +176,13 @@ const checkIpBlockList = async (ip) => {
 app.post('/send', async (req, res, next) => {
   return Promise.resolve().then(async () => {
     const {chain, address, recapcha_token} = req.body;
-    // Verify recaptcha
-    const recaptchaVerification = await getRecaptchaVerification(recapcha_token);
-    console.log('recaptchaVerification response:', JSON.stringify(recaptchaVerification, null, 2));
-    if (!recaptchaVerification.success) {
-      return res.status(401).json({ code: 1, message: 'Recaptcha verification failed' });
+    if (conf.reCaptchaEnabled) {
+      // Verify recaptcha
+      const recaptchaVerification = await getRecaptchaVerification(recapcha_token);
+      console.log('recaptchaVerification response:', JSON.stringify(recaptchaVerification, null, 2));
+      if (!recaptchaVerification.success) {
+        return res.status(401).json({ code: 1, message: 'Recaptcha verification failed' });
+      }
     }
 
     // Process request
@@ -266,10 +268,8 @@ async function sendCosmosTx(recipients, chain) {
     console.log(`using faucet ${firstAccount.address}`);
 
     const rpcEndpoint = chainConf.endpoint.rpc_endpoint;
-    const client = await SigningStargateClient.connectWithSigner(rpcEndpoint, wallet, { gasPrice: "0.025uallo" });
-
+    const client = await SigningStargateClient.connectWithSigner(rpcEndpoint, wallet, { gasPrice: chainConf.tx.fee.gasPrice });
     const amount = chainConf.tx.amount;
-    const fee = chainConf.tx.fee;
 
     const messages = recipients.map(recipient => ({
       typeUrl: "/cosmos.bank.v1beta1.MsgSend",
