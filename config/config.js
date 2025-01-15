@@ -42,7 +42,7 @@ export default {
             ],
             fee: {
                 amount: [{ denom: "uallo", amount: "500" }],
-                gas: "200000",
+                gasPrice: "11uallo"
             },
         },
         limit: {
@@ -59,5 +59,6 @@ export default {
     reCaptcha: {
         siteKey: process.env.RECAPTCHA_SITE_KEY,
         secretKey: process.env.RECAPTCHA_SECRET_KEY
-    }
+    },
+    reCaptchaEnabled: true
 }
